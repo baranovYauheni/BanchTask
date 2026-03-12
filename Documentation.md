@@ -1,6 +1,6 @@
 # Service Appointment Management System (SAMS) - Documentation
 
-## 2.1. Data Model
+## 1.1. Data Model
 
 During the analysis of the current Salesforce configuration, the metadata of the custom object `Service_Appointment__c` was verified against the first point of the functional requirements.
 
