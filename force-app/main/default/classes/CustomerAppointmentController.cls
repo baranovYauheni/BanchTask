@@ -1,26 +1,32 @@
+/**
+ * CustomerAppointmentController — AuraEnabled controller for customerAppointmentList LWC.
+ *
+ * SOLID — Single Responsibility Principle (S):
+ *   Only responsible for exposing @AuraEnabled methods to LWC.
+ *   All business logic is delegated to IAppointmentService.
+ *
+ * SOLID — Dependency Inversion Principle (D):
+ *   Depends on IAppointmentService abstraction, not on AppointmentService directly.
+ *   @TestVisible allows injecting a mock in unit tests.
+ *
+ * Security (Requirement 2.8): with sharing enforces record-level access.
+ */
 public with sharing class CustomerAppointmentController {
 
+    // D — Dependency Inversion: depends on interface, not concrete class
+    @TestVisible
+    private static IAppointmentService appointmentService = new AppointmentService();
+
     @AuraEnabled
-    public static List<Service_Appointment__c> getAppointmentsForCustomer(Id contactId, String sortOrder) {
-        String order = (sortOrder == 'DESC') ? 'DESC' : 'ASC';
-        String query = 'SELECT Id, Name, Appointment_Date_Time__c, Status__c, Description__c, ' +
-                       'Service_Agent__c, Service_Agent__r.Name ' +
-                       'FROM Service_Appointment__c ' +
-                       'WHERE Customer__c = :contactId ' +
-                       'ORDER BY Appointment_Date_Time__c ' + order +
-                       ' LIMIT 200';
-        return Database.query(query);
+    public static List<Service_Appointment__c> getAppointmentsForCustomer(
+        Id contactId,
+        String sortOrder
+    ) {
+        return appointmentService.getAppointmentsForCustomer(contactId, sortOrder);
     }
 
     @AuraEnabled
     public static void cancelAppointments(List<Id> appointmentIds) {
-        List<Service_Appointment__c> toUpdate = new List<Service_Appointment__c>();
-        for (Id apptId : appointmentIds) {
-            toUpdate.add(new Service_Appointment__c(
-                Id = apptId,
-                Status__c = 'Cancelled'
-            ));
-        }
-        update toUpdate;
+        appointmentService.cancelAppointments(appointmentIds);
     }
 }

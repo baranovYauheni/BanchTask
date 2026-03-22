@@ -1,9 +1,23 @@
-public with sharing class AppointmentStatusChangedTriggerHandler {
+/**
+ * AppointmentStatusChangedTriggerHandler — extends BaseTriggerHandler.
+ *
+ * SOLID — Single Responsibility Principle (S):
+ *   Responsible only for converting incoming Platform Event data
+ *   into Appointment_Status_Log__c records.
+ *
+ * SOLID — Liskov Substitution Principle (L):
+ *   Correctly extends BaseTriggerHandler by overriding only onAfterInsert,
+ *   without altering the execute() contract.
+ *
+ * Bulk Safety (Requirement 2.7):
+ *   Collects all log records into a single List before one insert DML call.
+ */
+public with sharing class AppointmentStatusChangedTriggerHandler extends BaseTriggerHandler {
 
-    public void onAfterInsert(List<Change_Service_Appointment__e> events) {
+    protected override void onAfterInsert(List<SObject> newRecords) {
         List<Appointment_Status_Log__c> logsToInsert = new List<Appointment_Status_Log__c>();
 
-        for (Change_Service_Appointment__e evt : events) {
+        for (Change_Service_Appointment__e evt : (List<Change_Service_Appointment__e>) newRecords) {
             logsToInsert.add(new Appointment_Status_Log__c(
                 Service_Appointment__c = (Id) evt.Appointment_Id__c,
                 Old_Status__c          = evt.Old_status__c,

@@ -108,3 +108,90 @@ Stores a history record for every status change:
 - **Handler:** `AppointmentStatusChangedTriggerHandler`
 - **Logic:** For each received event, creates an `Appointment_Status_Log__c` record.
 - **Bulk-safe:** Collects log records in a `List` before a single `insert` DML call.
+
+---
+
+## 2.5. Apex, OOP & SOLID
+
+### Architecture Overview
+
+```
+«interface»              «interface»
+IEventPublisher          IAppointmentService
+       ↑                        ↑
+PlatformEventPublisher   AppointmentService
+       ↑                        ↑
+       └──── ServiceAppointmentTriggerHandler (DI constructor)
+                                ↑
+                   AgentScheduleController (static field)
+                   CustomerAppointmentController (static field)
+
+«abstract»
+BaseTriggerHandler
+       ↑
+       ├── ServiceAppointmentTriggerHandler
+       └── AppointmentStatusChangedTriggerHandler
+```
+
+### Interfaces
+
+#### `IAppointmentService`
+Defines the contract for all appointment business operations:
+- `getAppointmentsForAgent()`
+- `getAppointmentsForCustomer()`
+- `updateAppointments()`
+- `cancelAppointments()`
+- `validateNoDoubleBooking()`
+
+**Used by:** `AgentScheduleController`, `CustomerAppointmentController`, `ServiceAppointmentTriggerHandler` (injected via constructor).
+
+#### `IEventPublisher`
+Defines a single method: `publish(List<SObject> events)`.
+
+**Used by:** `ServiceAppointmentTriggerHandler` (injected via constructor).  
+**Implemented by:** `PlatformEventPublisher` (wraps `EventBus.publish()`).
+
+### Abstract Class: `BaseTriggerHandler`
+Implements the **Template Method** design pattern. Dispatches Trigger context events to virtual hook methods (`onBeforeInsert`, `onBeforeUpdate`, `onAfterInsert`, `onAfterUpdate`).
+
+**Extended by:** `ServiceAppointmentTriggerHandler`, `AppointmentStatusChangedTriggerHandler`.
+
+**Usage in every trigger:**
+```apex
+new MyHandler().execute(); // delegates to the correct virtual hook
+```
+
+### SOLID Principles Applied
+
+| Principle | Implementation |
+|---|---|
+| **S** — Single Responsibility | `AppointmentService` owns business logic only; `PlatformEventPublisher` publishes events only; controllers only expose `@AuraEnabled` methods; `BaseTriggerHandler` only dispatches Trigger context. |
+| **O** — Open/Closed | New notification channel = new class implementing `IEventPublisher`. No existing handler changes. New trigger events = override a virtual method in a subclass. |
+| **L** — Liskov Substitution | Any `IEventPublisher` or `IAppointmentService` implementation can replace the concrete class without breaking callers. Mock classes in tests demonstrate this. |
+| **I** — Interface Segregation | Two small, focused interfaces instead of one large one: `IAppointmentService` (business logic) and `IEventPublisher` (event publishing). |
+| **D** — Dependency Inversion | `ServiceAppointmentTriggerHandler` depends on `IEventPublisher` and `IAppointmentService` — not on `EventBus` or `AppointmentService` directly. Controllers use `@TestVisible private static IAppointmentService` — mockable in tests. |
+
+### Dependency Injection
+
+`ServiceAppointmentTriggerHandler` has two constructors:
+```apex
+// DI constructor — used in tests to inject mocks
+public ServiceAppointmentTriggerHandler(IEventPublisher pub, IAppointmentService svc) { ... }
+
+// Default constructor — wires real implementations for production
+public ServiceAppointmentTriggerHandler() {
+    this(new PlatformEventPublisher(), new AppointmentService());
+}
+```
+
+Controllers use `@TestVisible static IAppointmentService` fields:
+```apex
+@TestVisible
+private static IAppointmentService appointmentService = new AppointmentService();
+```
+This allows test classes to inject mock implementations without modifying production code.
+
+### Test Coverage
+- **`AppointmentServiceTest`** — covers `getAppointmentsForCustomer` (ASC/DESC), `cancelAppointments`, `validateNoDoubleBooking` (positive/negative), `updateAppointments`.
+- **`ServiceAppointmentTriggerHandlerTest`** — covers status-change event publishing, no-event on same status, and double-booking validation call — using injected mock classes (`MockEventPublisher`, `MockAppointmentService`).
+
