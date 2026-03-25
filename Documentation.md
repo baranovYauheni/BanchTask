@@ -57,10 +57,52 @@ The following Lightning Web Components (LWC) have been created for the Service A
 
 ---
 
-## 2.3. Asynchronous Processes — Platform Event
+## 2.3. Asynchronous Processes
+
+### Batch Apex: `AppointmentReminderBatch`
+**Purpose:** Sends email reminders to customers for all `Service_Appointment__c` records scheduled for the next day.
+
+**Implements:** `Database.Batchable<SObject>`, `Database.Stateful`
+
+| Method | Logic |
+|---|---|
+| `start()` | Returns a `QueryLocator` for all appointments tomorrow with status `New` or `Confirmed` and a non-null Contact email |
+| `execute()` | Builds and sends `Messaging.SingleEmailMessage` per appointment. One `Messaging.sendEmail()` call per chunk — bulk safe |
+| `finish()` | Logs summary. If any emails failed, sends an alert to the running user |
+
+**`Database.Stateful`** is used to track `emailsSent` and `emailsFailed` counters across all `execute()` chunks.
+
+**Schedule:** Wrapped by `AppointmentReminderScheduler` (implements `Schedulable`):
+```apex
+// Run daily at 8:00 AM
+System.schedule('Daily Appointment Reminders', '0 0 8 * * ?', new AppointmentReminderScheduler());
+```
+
+---
+
+### Queueable Apex: `BulkStatusUpdateQueueable`
+**Purpose:** Asynchronously bulk-updates `Status__c` on `Service_Appointment__c` records matching a given agent, date, and/or current status.
+
+**Implements:** `Queueable`
+
+**Typical use-case:** Cancel all active appointments for an agent on a specific day:
+```apex
+System.enqueueJob(new BulkStatusUpdateQueueable(agentId, targetDate));
+```
+
+**Full constructor** (for custom scenarios):
+```apex
+new BulkStatusUpdateQueueable(agentId, targetDate, 'New', 'Confirmed', 200, 0);
+// agentId, date, fromStatus, toStatus, batchSize, offset
+```
+
+**Chaining:** If the result set equals `batchSize`, a new Queueable job is automatically chained via `System.enqueueJob()` with an incremented offset — handles large datasets without hitting DML limits.
+
+---
 
 ### Platform Event: `Change_Service_Appointment__e`
 **Purpose:** Publishes a message whenever the `Status__c` field of a `Service_Appointment__c` record changes.
+
 
 **Fields:**
 | Field | Type | Description |
