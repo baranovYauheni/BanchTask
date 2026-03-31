@@ -1,13 +1,4 @@
-/**
- * BulkStatusUpdateQueueableTest
- *
- * Tests for BulkStatusUpdateQueueable.
- *
- * Covers:
- *   - Cancel all appointments for an agent on a specific date
- *   - No records to update — executes without error
- *   - Convenience constructor (agent + date)
- */
+
 @IsTest
 private class BulkStatusUpdateQueueableTest {
 
@@ -34,7 +25,6 @@ private class BulkStatusUpdateQueueableTest {
                 Status__c                = 'Confirmed',
                 Description__c           = 'Queueable test 2'
             ),
-            // Already cancelled — should NOT be updated again
             new Service_Appointment__c(
                 Customer__c              = customer.Id,
                 Service_Agent__c         = UserInfo.getUserId(),
@@ -58,7 +48,6 @@ private class BulkStatusUpdateQueueableTest {
         System.enqueueJob(job);
         Test.stopTest();
 
-        // Verify that New and Confirmed → Cancelled; already-cancelled stays Cancelled
         List<Service_Appointment__c> updated = [
             SELECT Status__c
             FROM Service_Appointment__c
@@ -73,7 +62,6 @@ private class BulkStatusUpdateQueueableTest {
 
     @IsTest
     static void testBulkUpdate_EmptyResult() {
-        // Delete all records so the query returns nothing
         delete [SELECT Id FROM Service_Appointment__c];
 
         Test.startTest();
@@ -84,7 +72,6 @@ private class BulkStatusUpdateQueueableTest {
         System.enqueueJob(job);
         Test.stopTest();
 
-        // Should complete without exception
         System.assertEquals(0,
             [SELECT COUNT() FROM Service_Appointment__c],
             'No records should exist'
@@ -96,7 +83,6 @@ private class BulkStatusUpdateQueueableTest {
         Date targetDate = Date.today().addDays(5);
 
         Test.startTest();
-        // Only update 'New' → 'Confirmed', leave 'Confirmed' as is
         BulkStatusUpdateQueueable job = new BulkStatusUpdateQueueable(
             UserInfo.getUserId(),
             targetDate,
@@ -108,7 +94,6 @@ private class BulkStatusUpdateQueueableTest {
         System.enqueueJob(job);
         Test.stopTest();
 
-        // The 'New' one should now be 'Confirmed'
         List<Service_Appointment__c> newOnes = [
             SELECT Status__c
             FROM Service_Appointment__c

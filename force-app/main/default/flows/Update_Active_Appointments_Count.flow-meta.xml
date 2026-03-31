@@ -11,15 +11,80 @@
         </value>
     </processMetadataValues>
     <processType>AutoLaunchedFlow</processType>
-    <status>Active</status>
-    <triggerType>RecordAfterSave</triggerType>
+    
+    <assignments>
+        <name>Count_Active</name>
+        <label>Count Active</label>
+        <locationX>176</locationX>
+        <locationY>254</locationY>
+        <assignmentItems>
+            <assignToReference>activeCount</assignToReference>
+            <operator>AssignCount</operator>
+            <value>
+                <elementReference>Get_Active_Appointments</elementReference>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>Update_Contact_Counter</targetReference>
+        </connector>
+    </assignments>
 
-    <!-- Triggered on Service_Appointment__c create or update -->
+    <recordLookups>
+        <name>Get_Active_Appointments</name>
+        <label>Get Active Appointments</label>
+        <locationX>176</locationX>
+        <locationY>134</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Count_Active</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Customer__c</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>$Record.Customer__c</elementReference>
+            </value>
+        </filters>
+        <filters>
+            <field>Status__c</field>
+            <operator>EqualTo</operator>
+            <value>
+                <stringValue>New</stringValue>
+            </value>
+        </filters>
+        <getFirstRecordOnly>false</getFirstRecordOnly>
+        <object>Service_Appointment__c</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+
+    <recordUpdates>
+        <name>Update_Contact_Counter</name>
+        <label>Update Contact Counter</label>
+        <locationX>176</locationX>
+        <locationY>374</locationY>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>$Record.Customer__c</elementReference>
+            </value>
+        </filters>
+        <inputAssignments>
+            <field>Active_Appointments__c</field>
+            <value>
+                <elementReference>activeCount</elementReference>
+            </value>
+        </inputAssignments>
+        <object>Contact</object>
+    </recordUpdates>
+
     <start>
         <locationX>50</locationX>
         <locationY>0</locationY>
         <connector>
-            <targetReference>Get_Active_Appointment_Count</targetReference>
+            <targetReference>Get_Active_Appointments</targetReference>
         </connector>
         <filterLogic>or</filterLogic>
         <filters>
@@ -41,40 +106,8 @@
         <triggerType>RecordAfterSave</triggerType>
     </start>
 
-    <!-- Aggregate: count active appointments for this contact -->
-    <recordLookups>
-        <name>Get_Active_Appointment_Count</name>
-        <label>Get Active Appointment Count</label>
-        <locationX>176</locationX>
-        <locationY>134</locationY>
-        <assignNullValuesIfNoRecordsFound>true</assignNullValuesIfNoRecordsFound>
-        <connector>
-            <targetReference>Update_Contact_Counter</targetReference>
-        </connector>
-        <filterLogic>and</filterLogic>
-        <filters>
-            <field>Customer__c</field>
-            <operator>EqualTo</operator>
-            <value>
-                <elementReference>$Record.Customer__c</elementReference>
-            </value>
-        </filters>
-        <filters>
-            <field>Status__c</field>
-            <operator>EqualTo</operator>
-            <value>
-                <stringValue>New</stringValue>
-            </value>
-        </filters>
-        <getFirstRecordOnly>false</getFirstRecordOnly>
-        <object>Service_Appointment__c</object>
-        <outputAssignments>
-            <assignToReference>activeCount</assignToReference>
-            <field>Id</field>
-        </outputAssignments>
-    </recordLookups>
+    <status>Active</status>
 
-    <!-- Variable to hold the count -->
     <variables>
         <name>activeCount</name>
         <dataType>Number</dataType>
@@ -86,27 +119,4 @@
             <numberValue>0.0</numberValue>
         </value>
     </variables>
-
-    <!-- Update Contact.Active_Appointments__c -->
-    <recordUpdates>
-        <name>Update_Contact_Counter</name>
-        <label>Update Contact Counter</label>
-        <locationX>176</locationX>
-        <locationY>254</locationY>
-        <filterLogic>and</filterLogic>
-        <filters>
-            <field>Id</field>
-            <operator>EqualTo</operator>
-            <value>
-                <elementReference>$Record.Customer__c</elementReference>
-            </value>
-        </filters>
-        <inputAssignments>
-            <field>Active_Appointments__c</field>
-            <value>
-                <elementReference>activeCount</elementReference>
-            </value>
-        </inputAssignments>
-        <object>Contact</object>
-    </recordUpdates>
 </Flow>

@@ -10,7 +10,7 @@ public with sharing class AppointmentReminderBatch
     implements Database.Batchable<SObject>, Database.Stateful {
 
     private Integer emailsSent   = 0;
-    private Integer emailsFailed = 0;
+    @TestVisible private Integer emailsFailed = 0;
 
     public Database.QueryLocator start(Database.BatchableContext bc) {
         DateTime tomorrowStart = DateTime.newInstance(Date.today().addDays(1), Time.newInstance(0,  0, 0, 0));
@@ -32,6 +32,7 @@ public with sharing class AppointmentReminderBatch
             AND   Appointment_Date_Time__c <= :tomorrowEnd
             AND   Status__c IN ('New', 'Confirmed')
             AND   Customer__r.Email != null
+            WITH SECURITY_ENFORCED
         ]);
     }
 

@@ -34,7 +34,7 @@ public with sharing class AppointmentService implements IAppointmentService {
             DateTime endDt = DateTime.newInstance(endDate, Time.newInstance(23, 59, 59, 999));
             query += 'AND Appointment_Date_Time__c <= :endDt ';
         }
-        query += 'ORDER BY Appointment_Date_Time__c ASC LIMIT 100';
+        query += 'WITH SECURITY_ENFORCED ORDER BY Appointment_Date_Time__c ASC LIMIT 100';
 
         return Database.query(query);
     }
@@ -49,6 +49,7 @@ public with sharing class AppointmentService implements IAppointmentService {
             'Service_Agent__c, Service_Agent__r.Name ' +
             'FROM Service_Appointment__c ' +
             'WHERE Customer__c = :contactId ' +
+            'WITH SECURITY_ENFORCED ' +
             'ORDER BY Appointment_Date_Time__c ' + order + ' LIMIT 200';
         return Database.query(query);
     }
@@ -74,6 +75,10 @@ public with sharing class AppointmentService implements IAppointmentService {
         }
 
         if (!toUpdate.isEmpty()) {
+            if (!Schema.sObjectType.Service_Appointment__c.fields.Status__c.isUpdateable() ||
+                !Schema.sObjectType.Service_Appointment__c.fields.Appointment_Date_Time__c.isUpdateable()) {
+                throw new SecurityException('Insufficient permissions to update appointment fields.');
+            }
             update toUpdate;
         }
     }
@@ -87,6 +92,9 @@ public with sharing class AppointmentService implements IAppointmentService {
             ));
         }
         if (!toUpdate.isEmpty()) {
+            if (!Schema.sObjectType.Service_Appointment__c.fields.Status__c.isUpdateable()) {
+                throw new SecurityException('Insufficient permissions to cancel appointments.');
+            }
             update toUpdate;
         }
     }
@@ -103,7 +111,6 @@ public with sharing class AppointmentService implements IAppointmentService {
             if (rec.Status__c == 'Cancelled' || rec.Status__c == 'Completed') continue;
             if (rec.Service_Agent__c == null || rec.Appointment_Date_Time__c == null) continue;
 
-            // For updates: skip if neither agent nor time changed
             if (oldMap != null) {
                 Service_Appointment__c old = oldMap.get(rec.Id);
                 if (old.Service_Agent__c == rec.Service_Agent__c &&
@@ -120,13 +127,11 @@ public with sharing class AppointmentService implements IAppointmentService {
 
         if (agentIds.isEmpty()) return;
 
-        // Exclude the records currently being saved (update scenario)
         Set<Id> currentIds = new Set<Id>();
         for (Service_Appointment__c rec : newRecords) {
             if (rec.Id != null) currentIds.add(rec.Id);
         }
 
-        // Single SOQL for all agents and the full time range — bulk safe
         List<Service_Appointment__c> existing = [
             SELECT Id, Service_Agent__c, Appointment_Date_Time__c
             FROM Service_Appointment__c
@@ -135,9 +140,9 @@ public with sharing class AppointmentService implements IAppointmentService {
             AND   Appointment_Date_Time__c <= :rangeEnd
             AND   Status__c NOT IN ('Cancelled', 'Completed')
             AND   Id NOT IN :currentIds
+            WITH SECURITY_ENFORCED
         ];
 
-        // Build map: agentId → booked DateTimes
         Map<Id, Set<DateTime>> bookedTimes = new Map<Id, Set<DateTime>>();
         for (Service_Appointment__c ex : existing) {
             if (!bookedTimes.containsKey(ex.Service_Agent__c)) {

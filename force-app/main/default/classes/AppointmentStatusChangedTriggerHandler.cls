@@ -1,19 +1,10 @@
-/**
- * AppointmentStatusChangedTriggerHandler — extends BaseTriggerHandler.
- *
- * SOLID — Single Responsibility Principle (S):
- *   Responsible only for converting Platform Event data
- *   into Appointment_Status_Log__c records.
- *
- * SOLID — Liskov Substitution Principle (L):
- *   Correctly extends BaseTriggerHandler by overriding only onAfterInsert.
- */
 public with sharing class AppointmentStatusChangedTriggerHandler extends BaseTriggerHandler {
 
     protected override void onAfterInsert(List<SObject> newRecords) {
+        List<Change_Service_Appointment__e> events = (List<Change_Service_Appointment__e>) newRecords;
         List<Appointment_Status_Log__c> logsToInsert = new List<Appointment_Status_Log__c>();
 
-        for (Change_Service_Appointment__e evt : (List<Change_Service_Appointment__e>) newRecords) {
+        for (Change_Service_Appointment__e evt : events) {
             logsToInsert.add(new Appointment_Status_Log__c(
                 Service_Appointment__c = (Id) evt.Appointment_Id__c,
                 Old_Status__c          = evt.Old_status__c,

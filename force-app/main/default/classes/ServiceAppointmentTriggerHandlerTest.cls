@@ -1,18 +1,7 @@
-/**
- * ServiceAppointmentTriggerHandlerTest — unit tests for ServiceAppointmentTriggerHandler.
- *
- * Uses Dependency Injection to inject a mock IEventPublisher —
- * demonstrates that the DI pattern is working correctly and testable.
- *
- * Covers:
- *   - onAfterUpdate: Platform Event published when Status changes
- *   - onAfterUpdate: No event published when Status does NOT change
- *   - onBeforeInsert: double-booking via trigger fires correctly
- */
+
 @IsTest
 private class ServiceAppointmentTriggerHandlerTest {
 
-    // ─── Mock IEventPublisher ─────────────────────────────────────────────────
     /**
      * MockEventPublisher — test double for IEventPublisher.
      * Captures published events instead of sending to EventBus.
@@ -28,7 +17,6 @@ private class ServiceAppointmentTriggerHandlerTest {
         }
     }
 
-    // ─── Mock IAppointmentService ─────────────────────────────────────────────
     private class MockAppointmentService implements IAppointmentService {
         public Boolean validateCalled = false;
 
@@ -49,8 +37,6 @@ private class ServiceAppointmentTriggerHandlerTest {
         }
     }
 
-    // ─── Test Setup ───────────────────────────────────────────────────────────
-
     @TestSetup
     static void makeData() {
         Contact customer = new Contact(LastName = 'TriggerTestCustomer');
@@ -60,8 +46,6 @@ private class ServiceAppointmentTriggerHandlerTest {
     private static Contact getCustomer() {
         return [SELECT Id FROM Contact WHERE LastName = 'TriggerTestCustomer' LIMIT 1];
     }
-
-    // ─── Tests ────────────────────────────────────────────────────────────────
 
     @IsTest
     static void testAfterUpdate_StatusChanged_PublishesEvent() {
@@ -79,7 +63,6 @@ private class ServiceAppointmentTriggerHandlerTest {
         MockEventPublisher mockPublisher = new MockEventPublisher();
         MockAppointmentService mockService = new MockAppointmentService();
 
-        // Build trigger-like context manually using the DI constructor
         List<Service_Appointment__c> newList = new List<Service_Appointment__c>{
             new Service_Appointment__c(
                 Id              = appt.Id,
@@ -95,10 +78,10 @@ private class ServiceAppointmentTriggerHandlerTest {
             )
         };
 
+        Test.setMock(HttpCalloutMock.class, new WebhookCalloutMock());
         Test.startTest();
         ServiceAppointmentTriggerHandler handler =
             new ServiceAppointmentTriggerHandler(mockPublisher, mockService);
-        // Call onAfterUpdate directly (simulates trigger context)
         handler.onAfterUpdate(newList, oldMap);
         Test.stopTest();
 

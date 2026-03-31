@@ -1,25 +1,12 @@
-/**
- * AppointmentServiceTest — unit tests for AppointmentService.
- *
- * Covers:
- *   - getAppointmentsForCustomer (sort ASC / DESC)
- *   - cancelAppointments (bulk)
- *   - validateNoDoubleBooking (positive: no conflict, negative: conflict → error)
- *   - updateAppointments
- */
+
 @IsTest
 private class AppointmentServiceTest {
 
-    // ─── Test Data Setup ─────────────────────────────────────────────────────
-
     @TestSetup
     static void makeData() {
-        // Create a Contact (Customer)
         Contact customer = new Contact(LastName = 'TestCustomer');
         insert customer;
 
-        // Create a User (Service Agent) — use current running user for simplicity
-        // Appointments will use the running user as agent
     }
 
     private static Contact getCustomer() {
@@ -41,7 +28,23 @@ private class AppointmentServiceTest {
         );
     }
 
-    // ─── getAppointmentsForCustomer ─────────────────────────────────────────
+    @IsTest
+    static void testGetAppointmentsForAgent() {
+        Contact customer = getCustomer();
+        DateTime t1 = DateTime.now().addDays(1);
+        
+        List<Service_Appointment__c> appts = new List<Service_Appointment__c>{
+            buildAppointment(customer.Id, UserInfo.getUserId(), t1, 'New')
+        };
+        insert appts;
+        
+        Test.startTest();
+        IAppointmentService svc = new AppointmentService();
+        List<Service_Appointment__c> result = svc.getAppointmentsForAgent(UserInfo.getUserId(), 'New', Date.today(), Date.today().addDays(7));
+        Test.stopTest();
+        
+        System.assertEquals(1, result.size(), 'Should return 1 appointment');
+    }
 
     @IsTest
     static void testGetAppointmentsForCustomer_ASC() {
@@ -91,8 +94,6 @@ private class AppointmentServiceTest {
         );
     }
 
-    // ─── cancelAppointments ──────────────────────────────────────────────────
-
     @IsTest
     static void testCancelAppointments() {
         Contact customer = getCustomer();
@@ -117,14 +118,11 @@ private class AppointmentServiceTest {
         }
     }
 
-    // ─── validateNoDoubleBooking ─────────────────────────────────────────────
-
     @IsTest
     static void testValidateNoDoubleBooking_NoConflict() {
         Contact customer = getCustomer();
         DateTime apptTime = DateTime.now().addDays(3);
 
-        // Existing appointment at a DIFFERENT time — no conflict expected
         Service_Appointment__c existing = buildAppointment(
             customer.Id, UserInfo.getUserId(), apptTime.addHours(1), 'New'
         );
@@ -136,7 +134,6 @@ private class AppointmentServiceTest {
 
         Test.startTest();
         IAppointmentService svc = new AppointmentService();
-        // Should not throw — no conflict
         svc.validateNoDoubleBooking(new List<Service_Appointment__c>{ newAppt }, null);
         Test.stopTest();
 
@@ -148,13 +145,11 @@ private class AppointmentServiceTest {
         Contact customer = getCustomer();
         DateTime apptTime = DateTime.now().addDays(4);
 
-        // Existing appointment at the SAME time — conflict expected
         Service_Appointment__c existing = buildAppointment(
             customer.Id, UserInfo.getUserId(), apptTime, 'New'
         );
         insert existing;
 
-        // This is what the trigger would pass — a new record (no Id) at the same time
         Service_Appointment__c newAppt = buildAppointment(
             customer.Id, UserInfo.getUserId(), apptTime, 'New'
         );
@@ -174,8 +169,6 @@ private class AppointmentServiceTest {
 
         System.assert(exceptionThrown, 'DmlException should be thrown for double-booking');
     }
-
-    // ─── updateAppointments ──────────────────────────────────────────────────
 
     @IsTest
     static void testUpdateAppointments() {

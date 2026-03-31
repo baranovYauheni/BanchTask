@@ -283,3 +283,34 @@ This allows test classes to inject mock implementations without modifying produc
 - **`AppointmentServiceTest`** — covers `getAppointmentsForCustomer` (ASC/DESC), `cancelAppointments`, `validateNoDoubleBooking` (positive/negative), `updateAppointments`.
 - **`ServiceAppointmentTriggerHandlerTest`** — covers status-change event publishing, no-event on same status, and double-booking validation call — using injected mock classes (`MockEventPublisher`, `MockAppointmentService`).
 
+---
+
+## 2.8. Security & Sharing
+
+### Field-Level Security (FLS) & CRUD Checks
+Explicit security checks have been implemented across all controllers, queueables, and service classes to comply with Salesforce secure coding guidelines:
+- **`WITH SECURITY_ENFORCED`:** All SOQL queries in `AgentScheduleController`, `CustomerAppointmentController`, `AppointmentService`, `AppointmentReminderBatch`, and `BulkStatusUpdateQueueable` strictly use `WITH SECURITY_ENFORCED`.
+- **`isUpdateable()` Checks:** Before any DML `update` operation (e.g., bulk status updates, cancellation, inline editing), Apex methods explicitly check `Schema.sObjectType.Service_Appointment__c.fields.Status__c.isUpdateable()`. A `SecurityException` is thrown if the user lacks the required permission.
+
+### Manager Record Visibility (Requirement 2.1)
+- **Problem:** Service agents should only see their own records, while managers need to see all. Since the OWD for Service Appointments is `Private`, agents are automatically restricted.
+- **Solution:** Created an **Owner-Based Sharing Rule** (`Managers_Access_All_Appointments`) that shares all `Service_Appointment__c` records owned by `All Internal Users` to the `Service_Managers` Public Group with `Read/Write` access.
+
+---
+
+## 2.9. REST API Integration
+
+A foundational REST API callout architecture has been established to push appointment data to external systems.
+
+### Components
+1. **Named Credential (`Webhook_Site`)**
+   - Configured as `Anonymous` (NoAuthentication) pointing to https://webhook.site endpoint.
+   - Centralizes the endpoint and isolates configuration from code.
+2. **Queueable Apex (`AppointmentCalloutQueueable`)**
+   - Implements `Queueable` and `Database.AllowsCallouts`.
+   - Serializes a list of `Service_Appointment__c` records into JSON and performs an HTTP POST request to `callout:Webhook_Site`.
+3. **Trigger Integration**
+   - `ServiceAppointmentTriggerHandler.onAfterUpdate` identifies appointments where the `Status__c` has changed.
+   - Valid records are collected and passed to `System.enqueueJob(new AppointmentCalloutQueueable(...))`.
+4. **Mock Testing**
+   - `WebhookCalloutMock.cls` implements `HttpCalloutMock` to simulate successful JSON responses during test execution (used in `ServiceAppointmentTriggerHandlerTest`).

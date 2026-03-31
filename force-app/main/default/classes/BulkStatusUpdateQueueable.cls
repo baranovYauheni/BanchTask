@@ -32,7 +32,6 @@ public with sharing class BulkStatusUpdateQueueable implements Queueable {
         this.offset     = (offset != null && offset >= 0) ? offset : 0;
     }
 
-    // Convenience constructor — cancel all active appointments for an agent on a date
     public BulkStatusUpdateQueueable(Id agentId, Date targetDate) {
         this(agentId, targetDate, null, 'Cancelled', 200, 0);
     }
@@ -54,10 +53,13 @@ public with sharing class BulkStatusUpdateQueueable implements Queueable {
         if (String.isNotBlank(fromStatus)) {
             query += 'AND Status__c = \'' + fromStatus + '\' ';
         }
-        query += 'LIMIT ' + batchSize + ' OFFSET ' + offset;
+        query += 'WITH SECURITY_ENFORCED LIMIT ' + batchSize + ' OFFSET ' + offset;
 
         List<SObject> records = Database.query(query);
-
+        
+        if (!records.isEmpty() && !Schema.sObjectType.Service_Appointment__c.fields.Status__c.isUpdateable()) {
+            throw new SecurityException('Insufficient permissions to bulk update Status.');
+        }
         if (records.isEmpty()) {
             System.debug('BulkStatusUpdateQueueable: no more records to update.');
             return;
@@ -71,7 +73,6 @@ public with sharing class BulkStatusUpdateQueueable implements Queueable {
 
         System.debug('BulkStatusUpdateQueueable: updated ' + toUpdate.size() + ' records to "' + toStatus + '"');
 
-        // Chain next job if there may be more records
         if (records.size() == batchSize && !Test.isRunningTest()) {
             System.enqueueJob(new BulkStatusUpdateQueueable(
                 agentId, targetDate, fromStatus, toStatus, batchSize, offset + batchSize

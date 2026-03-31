@@ -1,0 +1,33 @@
+public with sharing class AppointmentCalloutQueueable implements Queueable, Database.AllowsCallouts {
+    
+    private List<Service_Appointment__c> appointments;
+
+    public AppointmentCalloutQueueable(List<Service_Appointment__c> appointments) {
+        this.appointments = appointments;
+    }
+
+    public void execute(QueueableContext context) {
+        if(appointments == null || appointments.isEmpty()) return;
+
+        Http http = new Http();
+        HttpRequest request = new HttpRequest();
+        request.setEndpoint('callout:Webhook_Site');
+        request.setMethod('POST');
+        request.setHeader('Content-Type', 'application/json');
+        
+        String jsonBody = JSON.serialize(appointments);
+        request.setBody(jsonBody);
+        
+        try {
+            HttpResponse response = http.send(request);
+            if (response.getStatusCode() != 200 && response.getStatusCode() != 201) {
+                System.debug(LoggingLevel.ERROR, 'Callout failed with status: ' + response.getStatus());
+                System.debug(LoggingLevel.ERROR, 'Callout Body: ' + response.getBody());
+            } else {
+                System.debug('Callout Success: ' + response.getBody());
+            }
+        } catch (Exception e) {
+            System.debug(LoggingLevel.ERROR, 'Exception in AppointmentCalloutQueueable: ' + e.getMessage());
+        }
+    }
+}

@@ -1,24 +1,13 @@
-/**
- * AppointmentReminderBatchTest
- *
- * Tests for AppointmentReminderBatch and AppointmentReminderScheduler.
- *
- * Covers:
- *   - Batch executes without errors when appointments exist for tomorrow
- *   - Batch executes without errors when no appointments exist (empty scope)
- *   - Scheduler correctly instantiates and enqueues the batch
- */
+
 @IsTest
 private class AppointmentReminderBatchTest {
 
     @TestSetup
     static void makeData() {
-        // Contact WITH email — should receive reminder
         Contact customerWithEmail = new Contact(
             LastName = 'CustomerWithEmail',
             Email    = 'test@example.com'
         );
-        // Contact WITHOUT email — should be skipped gracefully
         Contact customerNoEmail = new Contact(
             LastName = 'CustomerNoEmail'
         );
@@ -27,7 +16,6 @@ private class AppointmentReminderBatchTest {
         DateTime tomorrow = DateTime.newInstance(Date.today().addDays(1), Time.newInstance(10, 0, 0, 0));
 
         List<Service_Appointment__c> appts = new List<Service_Appointment__c>{
-            // Should be picked up — New status, has email
             new Service_Appointment__c(
                 Customer__c              = customerWithEmail.Id,
                 Service_Agent__c         = UserInfo.getUserId(),
@@ -35,7 +23,6 @@ private class AppointmentReminderBatchTest {
                 Status__c                = 'New',
                 Description__c           = 'Batch test appointment'
             ),
-            // Should be picked up — Confirmed status, has email
             new Service_Appointment__c(
                 Customer__c              = customerWithEmail.Id,
                 Service_Agent__c         = UserInfo.getUserId(),
@@ -43,7 +30,6 @@ private class AppointmentReminderBatchTest {
                 Status__c                = 'Confirmed',
                 Description__c           = 'Batch test confirmed'
             ),
-            // Should be SKIPPED — Cancelled status
             new Service_Appointment__c(
                 Customer__c              = customerWithEmail.Id,
                 Service_Agent__c         = UserInfo.getUserId(),
@@ -62,10 +48,8 @@ private class AppointmentReminderBatchTest {
         Id jobId = Database.executeBatch(batch, 200);
         Test.stopTest();
 
-        // Verify batch completed — no exception thrown
         System.assertNotEquals(null, jobId, 'Batch job should have been enqueued');
 
-        // Verify only non-cancelled appointments would be in scope (2 records)
         DateTime tomorrowStart = DateTime.newInstance(Date.today().addDays(1), Time.newInstance(0, 0, 0, 0));
         DateTime tomorrowEnd   = DateTime.newInstance(Date.today().addDays(1), Time.newInstance(23, 59, 59, 999));
 
@@ -81,7 +65,6 @@ private class AppointmentReminderBatchTest {
 
     @IsTest
     static void testBatch_EmptyScope() {
-        // Delete all appointments — batch should handle empty scope gracefully
         delete [SELECT Id FROM Service_Appointment__c];
 
         Test.startTest();
@@ -89,6 +72,16 @@ private class AppointmentReminderBatchTest {
         Test.stopTest();
 
         System.assertNotEquals(null, jobId, 'Batch should run even with empty scope');
+    }
+
+    @IsTest
+    static void testBatch_FinishWithErrors() {
+        AppointmentReminderBatch batch = new AppointmentReminderBatch();
+        batch.emailsFailed = 1;
+        Test.startTest();
+        batch.finish(null);
+        Test.stopTest();
+        System.assertEquals(1, batch.emailsFailed, 'Failed count should persist to finish');
     }
 
     @IsTest
