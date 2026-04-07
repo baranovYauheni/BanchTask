@@ -105,6 +105,18 @@
         <object>Service_Appointment__c</object>
     </recordCreates>
 
+    <formulas>
+        <name>fml_DateTime_Minus15</name>
+        <dataType>DateTime</dataType>
+        <expression>{!fld_DateTime} - (15 / 1440)</expression>
+    </formulas>
+
+    <formulas>
+        <name>fml_DateTime_Plus15</name>
+        <dataType>DateTime</dataType>
+        <expression>{!fld_DateTime} + (15 / 1440)</expression>
+    </formulas>
+
     <recordLookups>
         <name>Check_Conflicts</name>
         <label>Check Scheduling Conflicts</label>
@@ -124,9 +136,16 @@
         </filters>
         <filters>
             <field>Appointment_Date_Time__c</field>
-            <operator>EqualTo</operator>
+            <operator>GreaterThanOrEqualTo</operator>
             <value>
-                <elementReference>fld_DateTime</elementReference>
+                <elementReference>fml_DateTime_Minus15</elementReference>
+            </value>
+        </filters>
+        <filters>
+            <field>Appointment_Date_Time__c</field>
+            <operator>LessThan</operator>
+            <value>
+                <elementReference>fml_DateTime_Plus15</elementReference>
             </value>
         </filters>
         <filters>
@@ -253,7 +272,7 @@
         <allowPause>false</allowPause>
         <fields>
             <name>err_Conflict</name>
-            <fieldText>&lt;p&gt;&lt;strong&gt;Scheduling Conflict:&lt;/strong&gt; The selected agent already has an appointment at this date and time. Please choose a different time slot or a different agent.&lt;/p&gt;</fieldText>
+            <fieldText>&lt;p&gt;&lt;strong&gt;Scheduling Conflict:&lt;/strong&gt; The selected agent already has an appointment within 15 minutes of this time slot. Please choose a time at least 15 minutes apart or select a different agent.&lt;/p&gt;</fieldText>
             <fieldType>DisplayText</fieldType>
         </fields>
         <showFooter>true</showFooter>

@@ -161,13 +161,71 @@ private class AppointmentServiceTest {
         } catch (DmlException e) {
             exceptionThrown = true;
             System.assert(
-                e.getMessage().contains('already has an appointment'),
-                'Error message should mention double-booking'
+                e.getMessage().contains('within 15 minutes'),
+                'Error message should mention 15-minute buffer'
             );
         }
         Test.stopTest();
 
         System.assert(exceptionThrown, 'DmlException should be thrown for double-booking');
+    }
+
+    @IsTest
+    static void testValidateNoDoubleBooking_Within15MinBuffer() {
+        Contact customer = getCustomer();
+        DateTime apptTime = DateTime.now().addDays(5);
+
+        Service_Appointment__c existing = buildAppointment(
+            customer.Id, UserInfo.getUserId(), apptTime, 'New'
+        );
+        insert existing;
+
+        // Try to create an appointment 10 minutes later — should fail
+        Service_Appointment__c newAppt = buildAppointment(
+            customer.Id, UserInfo.getUserId(), apptTime.addMinutes(10), 'New'
+        );
+
+        Test.startTest();
+        Boolean exceptionThrown = false;
+        try {
+            insert newAppt;
+        } catch (DmlException e) {
+            exceptionThrown = true;
+            System.assert(
+                e.getMessage().contains('within 15 minutes'),
+                'Error message should mention 15-minute buffer'
+            );
+        }
+        Test.stopTest();
+
+        System.assert(exceptionThrown, 'DmlException should be thrown for appointment within 15-min buffer');
+    }
+
+    @IsTest
+    static void testValidateNoDoubleBooking_After15MinBuffer() {
+        Contact customer = getCustomer();
+        DateTime apptTime = DateTime.now().addDays(6);
+
+        Service_Appointment__c existing = buildAppointment(
+            customer.Id, UserInfo.getUserId(), apptTime, 'New'
+        );
+        insert existing;
+
+        // Create an appointment exactly 15 minutes later — should succeed
+        Service_Appointment__c newAppt = buildAppointment(
+            customer.Id, UserInfo.getUserId(), apptTime.addMinutes(15), 'New'
+        );
+
+        Test.startTest();
+        Boolean exceptionThrown = false;
+        try {
+            insert newAppt;
+        } catch (DmlException e) {
+            exceptionThrown = true;
+        }
+        Test.stopTest();
+
+        System.assert(!exceptionThrown, 'No exception should be thrown for appointment exactly 15 minutes apart');
     }
 
     @IsTest

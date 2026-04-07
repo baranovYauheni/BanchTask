@@ -99,6 +99,9 @@ public with sharing class AppointmentService implements IAppointmentService {
         }
     }
 
+    // Minimum gap (in minutes) required between two appointments for the same agent
+    private static final Integer BUFFER_MINUTES = 15;
+
     public void validateNoDoubleBooking(
         List<Service_Appointment__c> newRecords,
         Map<Id, Service_Appointment__c> oldMap
@@ -127,6 +130,10 @@ public with sharing class AppointmentService implements IAppointmentService {
 
         if (agentIds.isEmpty()) return;
 
+        // Expand the query range by the buffer so we catch nearby appointments
+        DateTime queryStart = rangeStart.addMinutes(-BUFFER_MINUTES);
+        DateTime queryEnd   = rangeEnd.addMinutes(BUFFER_MINUTES);
+
         Set<Id> currentIds = new Set<Id>();
         for (Service_Appointment__c rec : newRecords) {
             if (rec.Id != null) currentIds.add(rec.Id);
@@ -136,17 +143,18 @@ public with sharing class AppointmentService implements IAppointmentService {
             SELECT Id, Service_Agent__c, Appointment_Date_Time__c
             FROM Service_Appointment__c
             WHERE Service_Agent__c IN :agentIds
-            AND   Appointment_Date_Time__c >= :rangeStart
-            AND   Appointment_Date_Time__c <= :rangeEnd
+            AND   Appointment_Date_Time__c >= :queryStart
+            AND   Appointment_Date_Time__c <= :queryEnd
             AND   Status__c NOT IN ('Cancelled', 'Completed')
             AND   Id NOT IN :currentIds
             WITH SECURITY_ENFORCED
         ];
 
-        Map<Id, Set<DateTime>> bookedTimes = new Map<Id, Set<DateTime>>();
+        // Build a map of agent → list of booked DateTimes
+        Map<Id, List<DateTime>> bookedTimes = new Map<Id, List<DateTime>>();
         for (Service_Appointment__c ex : existing) {
             if (!bookedTimes.containsKey(ex.Service_Agent__c)) {
-                bookedTimes.put(ex.Service_Agent__c, new Set<DateTime>());
+                bookedTimes.put(ex.Service_Agent__c, new List<DateTime>());
             }
             bookedTimes.get(ex.Service_Agent__c).add(ex.Appointment_Date_Time__c);
         }
@@ -155,12 +163,20 @@ public with sharing class AppointmentService implements IAppointmentService {
             if (rec.Status__c == 'Cancelled' || rec.Status__c == 'Completed') continue;
             if (rec.Service_Agent__c == null || rec.Appointment_Date_Time__c == null) continue;
 
-            Set<DateTime> times = bookedTimes.get(rec.Service_Agent__c);
-            if (times != null && times.contains(rec.Appointment_Date_Time__c)) {
-                rec.Appointment_Date_Time__c.addError(
-                    'This agent already has an appointment at this date and time. ' +
-                    'Please choose a different time slot.'
-                );
+            List<DateTime> times = bookedTimes.get(rec.Service_Agent__c);
+            if (times != null) {
+                for (DateTime bookedTime : times) {
+                    Long diffMs = Math.abs(rec.Appointment_Date_Time__c.getTime() - bookedTime.getTime());
+                    Long bufferMs = (Long) BUFFER_MINUTES * 60 * 1000;
+                    if (diffMs < bufferMs) {
+                        rec.Appointment_Date_Time__c.addError(
+                            'This agent already has an appointment within ' + BUFFER_MINUTES +
+                            ' minutes of this time slot. Please choose a time at least ' +
+                            BUFFER_MINUTES + ' minutes apart.'
+                        );
+                        break;
+                    }
+                }
             }
         }
     }
