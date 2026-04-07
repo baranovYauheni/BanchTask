@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <description>After-Save Record-Triggered Flow on Service_Appointment__c. Recalculates the count of active (New or Confirmed) appointments for the related Contact and updates the Active_Appointments__c field.</description>
+    <interviewLabel>Update Active Appointments Count {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>Update Active Appointments Count</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>AutoLaunchedFlow</processType>
+    
+    <assignments>
+        <name>Count_Active</name>
+        <label>Count Active</label>
+        <locationX>176</locationX>
+        <locationY>254</locationY>
+        <assignmentItems>
+            <assignToReference>activeCount</assignToReference>
+            <operator>AssignCount</operator>
+            <value>
+                <elementReference>Get_Active_Appointments</elementReference>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>Update_Contact_Counter</targetReference>
+        </connector>
+    </assignments>
+
+    <recordLookups>
+        <name>Get_Active_Appointments</name>
+        <label>Get Active Appointments</label>
+        <locationX>176</locationX>
+        <locationY>134</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Count_Active</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Customer__c</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>$Record.Customer__c</elementReference>
+            </value>
+        </filters>
+        <filters>
+            <field>Status__c</field>
+            <operator>EqualTo</operator>
+            <value>
+                <stringValue>New</stringValue>
+            </value>
+        </filters>
+        <getFirstRecordOnly>false</getFirstRecordOnly>
+        <object>Service_Appointment__c</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+
+    <recordUpdates>
+        <name>Update_Contact_Counter</name>
+        <label>Update Contact Counter</label>
+        <locationX>176</locationX>
+        <locationY>374</locationY>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>$Record.Customer__c</elementReference>
+            </value>
+        </filters>
+        <inputAssignments>
+            <field>Active_Appointments__c</field>
+            <value>
+                <elementReference>activeCount</elementReference>
+            </value>
+        </inputAssignments>
+        <object>Contact</object>
+    </recordUpdates>
+
+    <start>
+        <locationX>50</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Get_Active_Appointments</targetReference>
+        </connector>
+        <filterLogic>or</filterLogic>
+        <filters>
+            <field>Status__c</field>
+            <operator>IsChanged</operator>
+            <value>
+                <booleanValue>true</booleanValue>
+            </value>
+        </filters>
+        <filters>
+            <field>Customer__c</field>
+            <operator>IsChanged</operator>
+            <value>
+                <booleanValue>true</booleanValue>
+            </value>
+        </filters>
+        <object>Service_Appointment__c</object>
+        <recordTriggerType>CreateAndUpdate</recordTriggerType>
+        <triggerType>RecordAfterSave</triggerType>
+    </start>
+
+    <status>Active</status>
+
+    <variables>
+        <name>activeCount</name>
+        <dataType>Number</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+        <scale>0</scale>
+        <value>
+            <numberValue>0.0</numberValue>
+        </value>
+    </variables>
+</Flow>
