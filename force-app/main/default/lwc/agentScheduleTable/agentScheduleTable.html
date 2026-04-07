@@ -37,6 +37,16 @@
                 </div>
 
             </div>
+
+            <!-- Bulk Actions -->
+            <div class="slds-m-top_medium slds-text-align_right" if:true={selectedAgentId}>
+                <lightning-button 
+                    variant="destructive-text" 
+                    label="Bulk Cancel 'New' Appointments (Queueable)" 
+                    icon-name="utility:ban" 
+                    onclick={handleBulkCancel}>
+                </lightning-button>
+            </div>
         </div>
 
         <!-- Save / Cancel Bar — appears only when there are pending edits -->

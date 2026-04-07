@@ -1,11 +1,10 @@
 /**
- * BulkStatusUpdateQueueable — asynchronously bulk-updates Status__c on appointments.
+ * BulkStatusUpdateQueueable — updates Status__c in the background.
  *
- * SOLID — Single Responsibility Principle (S):
- *   Responsible only for executing a bulk status update asynchronously.
+ * It just updates statuses for a bunch of records.
  *
- * Supports filtering by agent, date, and current status.
- * Chains a new job automatically if more records may exist (offset-based pagination).
+ * You can filter by agent, date, and current status.
+ * If there are too many records, it keeps going by starting another job.
  */
 public with sharing class BulkStatusUpdateQueueable implements Queueable {
 

@@ -1,23 +1,31 @@
 public with sharing class AgentScheduleController {
 
-    @AuraEnabled(cacheable=true)
+    public with sharing class UserSelector {
+        public List<User> getAgents() {
+            return [
+                SELECT Id, Name, UserRole.Name
+                FROM User 
+                WHERE isActive = true
+                AND UserRole.Name = 'Service Agent'
+                ORDER BY Name
+                LIMIT 100
+            ];
+        }
+    }
+
+    @AuraEnabled(cacheable = true)
     public static List<User> getServiceAgents() {
-        return [
-            SELECT Id, Name, UserRole.Name 
-            FROM User 
-            WHERE IsActive = true 
-            AND UserRole.Name = 'Service Agent'
-            ORDER BY Name
-            LIMIT 100
-        ];
+        return new UserSelector().getAgents();
     }
 
     @AuraEnabled
-    public static List<Service_Appointment__c> getAppointments(Id agentId, String status, Date startDate, Date endDate) {
+    public static List<Service_Appointment__c> getServiceAppointments(Id agentId, String status, Date startDate, Date endDate) {
+        //Используем динамический SOQL что бы избежать сложных условий и нескольких SOQL запросов на каждый случай
+
         String query = 'SELECT Id, Name, Customer__c, Customer__r.Name, Appointment_Date_Time__c, Status__c, Description__c ' +
                        'FROM Service_Appointment__c ' +
                        'WHERE Service_Agent__c = :agentId ';
-
+        
         if (String.isNotBlank(status)) {
             query += 'AND Status__c = :status ';
         }
@@ -37,24 +45,32 @@ public with sharing class AgentScheduleController {
     }
 
     @AuraEnabled
-    public static void updateAppointments(List<Map<String, String>> changes) {
-        List<Service_Appointment__c> toUpdate = new List<Service_Appointment__c>();
+    public static void updateServiceAppointments(List<Map<String, String>> changes) {
+        List<Service_Appointment__c> serviceAppts = new LIst<Service_Appointment__c>();
 
-        for (Map<String, String> change : changes) {
-            Service_Appointment__c appt = new Service_Appointment__c(Id = change.get('Id'));
+        for (Map<String,String> change : changes) {
+            Service_Appointment__c serviceAppt = new Service_Appointment__c(Id = change.get('Id'));
 
             if (change.containsKey('Status__c') && String.isNotBlank(change.get('Status__c'))) {
-                appt.Status__c = change.get('Status__c');
+                serviceAppt.Status__c = change.get('Status__c');
             }
+
             if (change.containsKey('Appointment_Date_Time__c') && String.isNotBlank(change.get('Appointment_Date_Time__c'))) {
-                appt.Appointment_Date_Time__c = (DateTime) JSON.deserialize(
+                serviceAppt.Appointment_Date_Time__c = (DateTime) JSON.deserialize(
                     '"' + change.get('Appointment_Date_Time__c') + '"', DateTime.class
                 );
             }
-
-            toUpdate.add(appt);
+            serviceAppts.add(serviceAppt);
         }
 
-        update toUpdate;
+        if (!serviceAppts.isEmpty()) {
+            update serviceAppts;
+        }
+    }
+
+    @AuraEnabled
+    public static void executeBulkCancel(Id agentId, String targetDateStr) {
+        Date targetDate = String.isNotBlank(targetDateStr) ? Date.valueOf(targetDateStr) : Date.today();
+        System.enqueueJob(new BulkStatusUpdateQueueable(agentId, targetDate, 'New', 'Cancelled', 50, 0));
     }
 }

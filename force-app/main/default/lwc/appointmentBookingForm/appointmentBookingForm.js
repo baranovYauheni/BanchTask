@@ -8,17 +8,18 @@ import DESCRIPTION_FIELD from "@salesforce/schema/Service_Appointment__c.Descrip
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 export default class AppointmentBookingForm extends LightningElement {
+
     @api recordId;
     @api objectApiName;
 
-    appointmentObject = SERVICE_APPOINTMENT.objectApiName;
+    appointmentObject = SERVICE_APPOINTMENT;
 
     fields = {
-        customer: CUSTOMER_FIELD.fieldApiName,
-        agent: AGENT_FIELD.fieldApiName,
-        date: DATE_FIELD.fieldApiName,
-        status: STATUS_FIELD.fieldApiName,
-        description: DESCRIPTION_FIELD.fieldApiName
+        customer: CUSTOMER_FIELD,
+        agent: AGENT_FIELD,
+        date: DATE_FIELD,
+        status: STATUS_FIELD,
+        description: DESCRIPTION_FIELD
     };
 
     get isContactRecord() {
@@ -28,7 +29,7 @@ export default class AppointmentBookingForm extends LightningElement {
     handleSuccess(event) {
         this.dispatchEvent(
             new ShowToastEvent({
-                title: 'Super! 🔥',
+                title: 'Super!',
                 message: 'Record created successfully! ID: ' + event.detail.id,
                 variant: 'success',
             })
